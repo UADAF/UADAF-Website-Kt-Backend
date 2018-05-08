@@ -28,7 +28,8 @@ class MusicServlet : HttpServlet() {
 
 
     override fun doPost(req: HttpServletRequest, res: HttpServletResponse) {
-        res.writer.print(process(req, res))
+        val process = process(req, res)
+        res.writer.print(process)
     }
 
     private fun process(req: HttpServletRequest, res: HttpServletResponse): JsonElement {
