@@ -123,7 +123,9 @@ class MusicServlet : HttpServlet() {
     }
 
     private fun listDirToArray(dir: Path, useFullPath: Boolean, filter: (Path) -> Boolean = { true }): JsonArray {
-        return Files.list(dir).filter(filter).map { if(useFullPath) musicDir.relativize(it) else it.fileName }.map(Path::toString).sorted().collect(jsonArrayCollector)
+        return Files.list(dir).use {
+            it.filter(filter).map { if(useFullPath) musicDir.relativize(it) else it.fileName }.map(Path::toString).sorted().collect(jsonArrayCollector)
+        }
     }
 
 }
