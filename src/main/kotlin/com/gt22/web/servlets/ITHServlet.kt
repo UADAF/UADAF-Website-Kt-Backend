@@ -47,7 +47,7 @@ class ITHServlet : HttpServlet() {
         val user = params["name"] ?: return rep("NAME_NOT_SET")
         getUserStorySmt.setString(1, user)
         val storyRes = getUserStorySmt.executeQuery()
-        val stroy = if(storyRes.next()) {
+        val story = if(storyRes.next()) {
             storyRes.getInt("story")
         } else {
             initUserSmt.setString(1, user)
@@ -57,7 +57,7 @@ class ITHServlet : HttpServlet() {
         val ret = JsonObject()
         ret["isLogged"] = true
         ret["user"] = user
-        ret["story"] = stroy
+        ret["story"] = story
         ret["storyName"] = "Please wait"
         ret["storyContent"] = "Please wait"
         return ret

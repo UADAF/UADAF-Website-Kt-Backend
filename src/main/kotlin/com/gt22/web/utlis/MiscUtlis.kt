@@ -2,21 +2,8 @@ package com.gt22.web.utlis
 
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
-import java.sql.ResultSet
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
-
-fun rep(res: ResultSet, cols: Map<String, String>): JsonObject {
-    val reply = JsonObject()
-    reply["error"] = false
-    for((name, type) in cols) {
-        when(type) {
-            "int" -> reply[name] = res.getInt(name)
-            "str" -> reply[name] = res.getString(name)
-        }
-    }
-    return reply
-}
 
 fun rep(msg: String, isError: Boolean = true): JsonObject {
     val reply = JsonObject()

@@ -18,7 +18,7 @@ import javax.servlet.http.HttpServletResponse
 class MusicServlet : HttpServlet() {
 
     private val musicDir = Paths.get(com.gt22.web.config["music", "root"].str)
-
+    private val str = JsonElement::str
 
     override fun doGet(req: HttpServletRequest, res: HttpServletResponse) {
         val rep = process(req, res)
@@ -72,11 +72,10 @@ class MusicServlet : HttpServlet() {
     }
 
     private fun getAllAlbums(): JsonArray {
-        val authors = getAuthors()
         val ret = JsonArray()
-        authors.forEach {
-            getAlbums(it.str).forEach { album ->
-                ret.add("${it.str}/${album.str}")
+        getAuthors().forEach(str) { author ->
+            getAlbums(author).forEach(str) { album ->
+                ret.add("$author/$album")
             }
         }
         return ret
@@ -89,23 +88,21 @@ class MusicServlet : HttpServlet() {
     private fun getAuthorSongs(author: String, useFullPath: Boolean): JsonObject {
         val ret = JsonObject()
         val albumsObj = JsonObject()
+        getAlbums(author).forEach(str) { albumsObj[it] = getSongs(author, it, useFullPath) }
         ret["albums"] = albumsObj
-        getAlbums(author).forEach { albumsObj[it.str] = getSongs(author, it.str, useFullPath) }
         ret["root"] = getSongs(author, "", useFullPath)
         return ret
     }
 
     private fun getAllSongs(useFullPath: Boolean): JsonArray {
-        val authors = getAuthors()
         val ret = JsonArray()
-        authors.forEach { author ->
-            val songs = getAuthorSongs(author.str, useFullPath)
-            songs.entrySet().forEach { (key, value) ->
-                value.arr.map {
-                    if (key != "root") {
-                        "${author.str}/$key/${it.str}"
+        getAuthors().forEach(str) { author ->
+            getAuthorSongs(author, useFullPath).entrySet().forEach { (album, songs) ->
+                songs.arr.map { song ->
+                    if (album != "root") {
+                        "$author/$album/${song.str}"
                     } else {
-                        "${author.str}/${it.str}"
+                        "$author/${song.str}"
                     }
                 }.forEach(ret::add)
             }
@@ -115,16 +112,19 @@ class MusicServlet : HttpServlet() {
 
     private fun getAll(useFullPath: Boolean): JsonObject {
         val ret = JsonObject()
-        val authors = getAuthors()
-        authors.forEach { author ->
-            ret[author.str] = getAuthorSongs(author.str, useFullPath)
+        getAuthors().forEach(str) { author ->
+            ret[author] = getAuthorSongs(author, useFullPath)
         }
         return ret
     }
 
     private fun listDirToArray(dir: Path, useFullPath: Boolean, filter: (Path) -> Boolean = { true }): JsonArray {
         return Files.list(dir).use {
-            it.filter(filter).map { if(useFullPath) musicDir.relativize(it) else it.fileName }.map(Path::toString).sorted().collect(jsonArrayCollector)
+            it.filter(filter)
+                    .map { if (useFullPath) musicDir.relativize(it) else it.fileName }
+                    .map(Path::toString)
+                    .sorted()
+                    .collect(jsonArrayCollector)
         }
     }
 
