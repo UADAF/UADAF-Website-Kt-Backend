@@ -49,12 +49,14 @@ class QuoterServlet : HttpServlet() {
         res.writer.println(r)
     }
 
-    private fun buildQuote(id: Int, author: String, adder: String, quote: String): JsonObject {
+    private fun buildQuote(id: Int, author: String, adder: String, quote: String, editedBy: String?, editedAt: Long?): JsonObject {
         val ret = JsonObject()
         ret["id"] = id
         ret["author"] = author
         ret["adder"] = adder
         ret["quote"] = quote
+        ret["edited_by"] = editedBy ?: "null"
+        ret["edited_at"] = editedAt ?: -1
         return ret
     }
 
@@ -88,7 +90,8 @@ class QuoterServlet : HttpServlet() {
         return with(res) {
             if (next()) {
                 buildQuote(getInt("id"), getString("author"),
-                        getString("adder"), getString("quote"))
+                        getString("adder"), getString("quote"),
+                        getString("edited_by"), getBigDecimal("edited_at").longValueExact())
             } else {
                 rep("QUOTE_NOT_FOUND")
             }
@@ -111,7 +114,8 @@ class QuoterServlet : HttpServlet() {
         with(res) {
             while(next()) {
                 quotes.add(buildQuote(getInt("id"), getString("author"),
-                        getString("adder"), getString("quote")))
+                        getString("adder"), getString("quote"),
+                        getString("edited_by"), getBigDecimal("edited_at").longValueExact()))
             }
         }
         return ret
