@@ -21,11 +21,13 @@ class QuoterServlet : HttpServlet() {
     private val totalStm: PreparedStatement
     private val rangeStm: PreparedStatement
     private val addQuoteStm: PreparedStatement
+    private val editQuoteStm: PreparedStatement
     init {
         posStm = base.prepareStatement("SELECT * FROM `quoter` WHERE `id` = ?")
         totalStm = base.prepareStatement("SELECT COUNT(*) FROM `quoter`")
         rangeStm = base.prepareStatement("SELECT * FROM `quoter` WHERE `id` > ? AND `id` < ?")
         addQuoteStm = base.prepareStatement("INSERT INTO `quoter` (`adder`, `author`, `quote`) VALUES (?,?,?)")
+        editQuoteStm = base.prepareStatement("UPDATE `quoter` SET `quote`= ?, `edited_by`= ?,`edited_at`= ? WHERE `id` = ? ")
     }
 
     override fun doPost(req: HttpServletRequest, res: HttpServletResponse) {
@@ -35,6 +37,7 @@ class QuoterServlet : HttpServlet() {
             when (params["task"]) {
                 "GET" -> get(params)
                 "ADD" -> add(params)
+                "EDIT" -> edit(params)
                 null -> rep("TASK_NOT_SET")
                 else -> rep("INVALID_TASK")
             }
@@ -130,6 +133,26 @@ class QuoterServlet : HttpServlet() {
             return rep("Added quote", false)
         }
         return rep("KEY_NOT_VALID")
+    }
+
+    fun edit(params: Map<String, String>): JsonObject {
+        checkIsSet(params, "id", "edited_by", "new_text", "key")
+        val id = params["id"]!!.toIntOrNull() ?: return rep("INVALID_ID")
+        posStm.setInt(1, id)
+        val res = posStm.executeQuery()
+        if (!res.next()) {
+            return rep("QUOTE_NOT_FOUND")
+        }
+        return if(isKeyValid(params["key"]!!)) {
+            editQuoteStm.setString(1, params["new_text"]!!)
+            editQuoteStm.setString(2, params["edited_by"]!!)
+            editQuoteStm.setLong(3, Date().time)
+            editQuoteStm.setInt(4, id)
+            editQuoteStm.executeQuery()
+            rep("Quote has been edited")
+        }else{
+            rep("KEY_NOT_VALID")
+        }
     }
 
     private fun isKeyValid(key: String): Boolean {
