@@ -57,7 +57,7 @@ class ParamNotSetException(msg: String) : Exception(msg)
 fun checkIsSet(params: Map<String, String>, vararg fields: String) {
     for(field in fields) {
         if(field !in params) {
-            throw ParamNotSetException(rep("$field not set").toString())
+            throw ParamNotSetException("$field not set")
         }
     }
 }
