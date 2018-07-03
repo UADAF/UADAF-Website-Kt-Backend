@@ -153,7 +153,7 @@ class QuoterServlet : HttpServlet() {
             editQuoteStm.setLong(3, Date().time)
             editQuoteStm.setInt(4, id)
             editQuoteStm.executeUpdate()
-            rep("Quote has been edited")
+            rep("Quote has been edited", false)
         }else{
             rep("KEY_NOT_VALID")
         }
