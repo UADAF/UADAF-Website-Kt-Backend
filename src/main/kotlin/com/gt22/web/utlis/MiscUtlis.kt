@@ -16,8 +16,8 @@ fun HttpServletRequest.params(): Map<String, String> {
     return parameterMap.mapValues { it.value[0] }
 }
 
-fun HttpServletResponse.prepare(encoding: String = "UTF-8", forbidCache: Boolean = true) {
-    contentType = "text/html; charset=$encoding"
+fun HttpServletResponse.prepare(encoding: String = "UTF-8", forbidCache: Boolean = true, mimeType: String = "application/json") {
+    contentType = "$mimeType; charset=$encoding"
     characterEncoding = encoding
     if(forbidCache) {
         setHeader("Cache-Control", "no-cache, no-store, must-revalidate")

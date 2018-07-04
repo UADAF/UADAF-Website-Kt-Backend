@@ -46,7 +46,8 @@ class QuoterServlet : HttpServlet() {
         } catch (e: ParamNotSetException) {
             rep(e.message!!)
         }
-        res.writer.println(r)
+
+        res.writer.println(formatResponse(r))
     }
 
     private fun buildQuote(id: Int, author: String, adder: String, quote: String, editedBy: String?, editedAt: Long?): JsonObject {

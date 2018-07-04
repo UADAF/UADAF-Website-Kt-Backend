@@ -27,7 +27,7 @@ class ITHServlet : HttpServlet() {
         res.prepare()
         val params = req.params()
         checkIsSet(params, "task")
-        val reply = try {
+        val r = try {
             when(params["task"]!!) {
                 "login" -> login(params)
                 "setStory" -> setStory(params)
@@ -36,10 +36,10 @@ class ITHServlet : HttpServlet() {
         } catch (e: SQLException) {
             rep("Something went wrong ${e.localizedMessage}")
         } catch (e: ParamNotSetException) {
-            e.message
+            rep(e.localizedMessage)
         }
 
-        res.writer.print(reply)
+        res.writer.print(formatResponse(r))
     }
 
     private fun login(params: Map<String, String>): JsonObject {
