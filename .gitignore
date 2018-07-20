@@ -4,3 +4,4 @@ build
 !.gitignore
 *.iml
 src/main/resources/conf/config.json
+Music

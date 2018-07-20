@@ -1,13 +1,11 @@
 package com.gt22.web.servlets
 
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonArray
-import com.google.gson.JsonElement
-import com.google.gson.JsonObject
-import com.gt22.web.utlis.*
-import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.Path
+import com.google.gson.*
+import com.gt22.uadam.data.*
+import com.gt22.uadam.utils.set
+import com.gt22.uadam.utils.str
+import com.gt22.uadam.utils.get
+import com.gt22.web.utlis.prepare
 import java.nio.file.Paths
 import javax.servlet.annotation.WebServlet
 import javax.servlet.http.HttpServlet
@@ -17,115 +15,63 @@ import javax.servlet.http.HttpServletResponse
 @WebServlet("/music")
 class MusicServlet : HttpServlet() {
 
-    private val musicDir = Paths.get(com.gt22.web.config["music", "root"].str)
-    private val str = JsonElement::str
+    private val context = MusicContext.create(Paths.get(com.gt22.web.config["music", "root"]!!.str))
 
     override fun doGet(req: HttpServletRequest, res: HttpServletResponse) {
-        val rep = process(req, res)
+        val rep = process(res)
         val gson = GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
-        res.writer.print(gson.toJson(rep).replace("\n", "<br>").replace("  ", "&nbsp;&nbsp;"))
+        res.writer.print(gson.toJson(rep))
     }
 
 
     override fun doPost(req: HttpServletRequest, res: HttpServletResponse) {
-        val process = process(req, res)
+        val process = process(res)
         res.writer.print(process)
     }
 
-    private fun process(req: HttpServletRequest, res: HttpServletResponse): JsonElement {
+    private fun process(res: HttpServletResponse): JsonElement {
         res.prepare()
-        val rep = try {
-            val params = req.params()
-            val useFullPath = "useFullPath" in params
-            if ("author" in params) {
-                if ("album" in params) {
-                    getSongs(params["author"]!!, params["album"]!!, useFullPath)
-                } else {
-                    getAuthorSongs(params["author"]!!, useFullPath)
-                }
-
-            } else {
-                if ("get" in params) {
-                    when (params["get"]!!) {
-                        "authors" -> getAuthors()
-                        "albums" -> getAllAlbums()
-                        "songs" -> getAllSongs(useFullPath)
-                        else -> rep("Invalid get request")
-                    }
-                } else {
-                    getAll(useFullPath)
-                }
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
-            rep("${e.message!!.replace(musicDir.toString(), "")} not found")
-        }
-        return formatResponse(rep)
+        return jsonify(context)
     }
 
-    private fun getAuthors(): JsonArray {
-        return listDirToArray(musicDir, false)
-    }
-
-    private fun getAlbums(author: String): JsonArray {
-        return listDirToArray(musicDir.resolve(author), false) { Files.isDirectory(it) }
-    }
-
-    private fun getAllAlbums(): JsonArray {
-        val ret = JsonArray()
-        getAuthors().forEach(str) { author ->
-            getAlbums(author).forEach(str) { album ->
-                ret.add("$author/$album")
-            }
-        }
-        return ret
-    }
-
-    private fun getSongs(author: String, album: String, useFullPath: Boolean): JsonArray {
-        return listDirToArray(musicDir.resolve(if (album == "") author else "$author/$album"), useFullPath) { !Files.isDirectory(it) }
-    }
-
-    private fun getAuthorSongs(author: String, useFullPath: Boolean): JsonObject {
+    fun jsonify(data: BaseData): JsonElement {
         val ret = JsonObject()
-        val albumsObj = JsonObject()
-        getAlbums(author).forEach(str) { albumsObj[it] = getSongs(author, it, useFullPath) }
-        ret["albums"] = albumsObj
-        ret["root"] = getSongs(author, "", useFullPath)
-        return ret
-    }
-
-    private fun getAllSongs(useFullPath: Boolean): JsonArray {
-        val ret = JsonArray()
-        getAuthors().forEach(str) { author ->
-            getAuthorSongs(author, useFullPath).entrySet().forEach { (album, songs) ->
-                songs.arr.map { song ->
-                    if (album != "root") {
-                        "$author/$album/${song.str}"
-                    } else {
-                        "$author/${song.str}"
-                    }
-                }.forEach(ret::add)
+        ret["meta"] = getMeta(data)
+        ret["children"] = if(data is Album) {
+            val children = JsonArray()
+            data.children.values.map(BaseData::name).forEach(children::add)
+            children
+        } else {
+            val children = JsonObject()
+            data.children.forEach { name, value ->
+                children[name] = jsonify(value)
             }
+            children
         }
         return ret
     }
 
-    private fun getAll(useFullPath: Boolean): JsonObject {
+    private fun type(data: BaseData): String = when (data) {
+        is Song -> "song"
+        is Album -> "album"
+        is Author -> "author"
+        is Group -> "group"
+        is MusicContext -> "context"
+        else -> "Unknown"
+    }
+
+    private fun getMeta(data: BaseData): JsonObject {
         val ret = JsonObject()
-        getAuthors().forEach(str) { author ->
-            ret[author] = getAuthorSongs(author, useFullPath)
+        if (data.title != data.name) {
+            ret["title"] = data.title
+        }
+        if (data.format != data.parent?.format) {
+            ret["format"] = data.format
+        }
+        if (data.img != data.parent?.img) {
+            ret["img"] = data.img
         }
         return ret
-    }
-
-    private fun listDirToArray(dir: Path, useFullPath: Boolean, filter: (Path) -> Boolean = { true }): JsonArray {
-        return Files.list(dir).use {
-            it.filter(filter)
-                    .map { if (useFullPath) musicDir.relativize(it) else it.fileName }
-                    .map(Path::toString)
-                    .sorted()
-                    .collect(jsonArrayCollector)
-        }
     }
 
 }

@@ -2,7 +2,7 @@ group 'com.gt22.web'
 version '1.0-SNAPSHOT'
 
 buildscript {
-    ext.kotlin_version = '1.2.40'
+    ext.kotlin_version = '1.2.51'
 
     repositories {
         mavenCentral()
@@ -20,6 +20,7 @@ sourceCompatibility = 1.8
 
 repositories {
     mavenCentral()
+    maven { url 'http://52.48.142.75/maven' }
 }
 
 dependencies {
@@ -28,6 +29,7 @@ dependencies {
     compile 'com.google.code.gson:gson:2.8.4'
     compile 'mysql:mysql-connector-java:5.1.13'
     compile 'com.google.guava:guava:25.0-jre'
+    compile 'com.uadaf:uadamlib:1.0'
 }
 
 compileKotlin {
