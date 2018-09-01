@@ -13,8 +13,7 @@ import java.sql.DriverManager
 object DatabaseConnector {
 
     private val cfg: JsonElement = config["database"]
-    private val connectUrl = "jdbc:mysql://${cfg["host"]!!.str}:3306/${cfg["db_name"]!!.str}?useUnicode=yes&characterEncoding=UTF-8"
-
+    private val connectUrl = "jdbc:mysql://${cfg["host"]!!.str}:3306/${cfg["db_name"]!!.str}?useUnicode=yes&characterEncoding=UTF-8&autoReconnect=true"
     init {
         Database.connect(connectUrl, "com.mysql.jdbc.Driver", cfg["login"]!!.str, cfg["password"]!!.str)
     }
