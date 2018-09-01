@@ -3,13 +3,17 @@ package com.gt22.web.servlets
 import com.google.common.hash.Hashing
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.gt22.randomutils.Instances
 import com.gt22.uadam.utils.set
 import com.gt22.web.DatabaseConnector
+import com.gt22.web.Quoter
+import com.gt22.web.Quoter.id
 import com.gt22.web.utlis.*
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.transactions.transaction
 import java.nio.charset.StandardCharsets
-import java.sql.PreparedStatement
 import java.sql.SQLException
-import java.util.*
+import java.util.Date
 import javax.servlet.annotation.WebServlet
 import javax.servlet.http.HttpServlet
 import javax.servlet.http.HttpServletRequest
@@ -17,22 +21,10 @@ import javax.servlet.http.HttpServletResponse
 
 @WebServlet("/quoter", "/Quoter.php")
 class QuoterServlet : HttpServlet() {
-    private val base = DatabaseConnector.connect()
-    private val posStm: PreparedStatement
-    private val totalStm: PreparedStatement
-    private val rangeStm: PreparedStatement
-    private val addQuoteStm: PreparedStatement
-    private val editQuoteStm: PreparedStatement
-    init {
-        posStm = base.prepareStatement("SELECT * FROM `quoter` WHERE `id` = ?")
-        totalStm = base.prepareStatement("SELECT COUNT(*) FROM `quoter`")
-        rangeStm = base.prepareStatement("SELECT * FROM `quoter` WHERE `id` > ? AND `id` < ?")
-        addQuoteStm = base.prepareStatement("INSERT INTO `quoter` (`adder`, `author`, `quote`) VALUES (?,?,?)")
-        editQuoteStm = base.prepareStatement("UPDATE `quoter` SET `quote`= ?, `edited_by`= ?,`edited_at`= ? WHERE `id` = ? ")
-    }
 
     override fun doPost(req: HttpServletRequest, res: HttpServletResponse) {
         res.prepare()
+        DatabaseConnector.init()
         val params = req.params()
         val r = try {
             when (params["task"]) {
@@ -51,112 +43,103 @@ class QuoterServlet : HttpServlet() {
         res.writer.println(formatResponse(r))
     }
 
-    private fun buildQuote(id: Int, author: String, adder: String, quote: String, editedBy: String?, editedAt: Long?): JsonObject {
-        val ret = JsonObject()
-        ret["id"] = id
-        ret["author"] = author
-        ret["adder"] = adder
-        ret["quote"] = quote
-        ret["edited_by"] = editedBy ?: "null"
-        ret["edited_at"] = editedAt ?: -1
-        return ret
+    private fun buildQuote(row: ResultRow): JsonObject {
+        return with(Quoter) {
+            with(row) {
+                val ret = JsonObject()
+                ret["id"] = get(id)
+                ret["author"] = get(author)
+                ret["adder"] = get(adder)
+                ret["quote"] = get(quote)
+                ret["edited_by"] = get(editedBy) ?: "null"
+                ret["edited_at"] = get(editedAt) ?: -1
+                ret
+            }
+        }
     }
 
     fun get(params: Map<String, String>): JsonObject {
         checkIsSet(params, "mode")
-        return when(params["mode"]) {
-            "pos" -> {
-               checkIsSet(params, "pos")
-                getPos(params["pos"]!!.toInt())
+        return transaction {
+            when (params["mode"]) {
+                "pos" -> {
+                    checkIsSet(params, "pos")
+                    getPos(params["pos"]!!.toInt())
+                }
+                "fromto" -> {
+                    checkIsSet(params, "from", "to")
+                    getRange(params["from"]!!.toInt(), params["to"]!!.toInt())
+                }
+                "rand" -> getRand()
+                "total" -> {
+                    val ret = JsonObject()
+                    ret["error"] = false
+                    ret["message"] = "success"
+                    ret["count"] = getQuoteCount()
+                    ret
+                }
+                null -> rep("MODE_NOT_SET")
+                else -> rep("INVALID_MODE")
             }
-            "fromto" -> {
-                checkIsSet(params, "from", "to")
-                getRange(params["from"]!!.toInt(), params["to"]!!.toInt())
-            }
-            "rand" -> getRand()
-            "total" -> {
-                val ret = JsonObject()
-                ret["error"] = false
-                ret["message"] = "success"
-                ret["count"] = getQuoteCount()
-                ret
-            }
-            null -> rep("MODE_NOT_SET")
-            else -> rep("INVALID_MODE")
         }
     }
 
     private fun getPos(pos: Int): JsonObject {
-        posStm.setInt(1, pos)
-        val res = posStm.executeQuery()
-        return with(res) {
-            if (next()) {
-                buildQuote(getInt("id"), getString("author"),
-                        getString("adder"), getString("quote"),
-                        getString("edited_by"), getBigDecimal("edited_at").longValueExact())
-            } else {
-                rep("QUOTE_NOT_FOUND")
-            }
+        return with(Quoter) {
+            buildQuote(select { id eq pos }.firstOrNull() ?: return rep("QUOTE_NOT_FOUND"))
         }
     }
 
     private fun getQuoteCount(): Int {
-        val res = totalStm.executeQuery()
-        res.next()
-        return res.getInt(1)
+        return Quoter.selectAll().count()
     }
 
     private fun getRange(from: Int, to: Int): JsonObject {
-        rangeStm.setInt(1, from)
-        rangeStm.setInt(2, to)
-        val res = rangeStm.executeQuery()
         val ret = JsonObject()
         val quotes = JsonArray()
         ret["quotes"] = quotes
-        with(res) {
-            while(next()) {
-                quotes.add(buildQuote(getInt("id"), getString("author"),
-                        getString("adder"), getString("quote"),
-                        getString("edited_by"), getBigDecimal("edited_at").longValueExact()))
-            }
-        }
+        Quoter.select { (id greater from) and (id less to) }
+                .asSequence().map(::buildQuote).forEach(quotes::add)
         return ret
     }
 
     private fun getRand(): JsonObject {
         val count = getQuoteCount()
-        val pos = Random().nextInt(count) + 1
+        val pos = Instances.getRand().nextInt(count) + 1
         return getPos(pos)
     }
 
     private fun add(params: Map<String, String>): JsonObject {
         checkIsSet(params, "key", "adder", "author", "quote")
-        if(isKeyValid(params["key"]!!)) {
-            addQuoteStm.setString(1, params["adder"]!!)
-            addQuoteStm.setString(2, params["author"]!!)
-            addQuoteStm.setString(3, params["quote"]!!)
-            addQuoteStm.executeUpdate()
-            return rep("Added quote", false)
+        return if(isKeyValid(params["key"]!!)) {
+            Quoter.insert {
+                it[adder] = params["adder"]!!
+                it[author] = params["author"]!!
+                it[quote] = params["quote"]!!
+            }
+            rep("Added quote", false)
+        } else {
+            rep("KEY_NOT_VALID")
         }
-        return rep("KEY_NOT_VALID")
     }
 
-    fun edit(params: Map<String, String>): JsonObject {
+    private fun edit(params: Map<String, String>): JsonObject {
         checkIsSet(params, "id", "edited_by", "new_text", "key")
-        val id = params["id"]!!.toIntOrNull() ?: return rep("INVALID_ID")
-        posStm.setInt(1, id)
-        val res = posStm.executeQuery()
-        if (!res.next()) {
-            return rep("QUOTE_NOT_FOUND")
-        }
         return if(isKeyValid(params["key"]!!)) {
-            editQuoteStm.setString(1, params["new_text"]!!)
-            editQuoteStm.setString(2, params["edited_by"]!!)
-            editQuoteStm.setLong(3, Date().time)
-            editQuoteStm.setInt(4, id)
-            editQuoteStm.executeUpdate()
-            rep("Quote has been edited", false)
-        }else{
+            val idN = params["id"]!!.toIntOrNull() ?: return rep("INVALID_ID")
+            transaction {
+                val updated = Quoter.update({ id eq idN }) {
+                    it[quote] = params["new_text"]!!
+                    it[editedBy] = params["edited_by"]
+                    it[editedAt] = Date().time
+                }
+                if (updated == 0) {
+                    rep("QUOTE_NOT_FOUND")
+                } else {
+                    rep("Quote has been edited", false)
+                }
+            }
+        } else {
             rep("KEY_NOT_VALID")
         }
     }

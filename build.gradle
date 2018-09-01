@@ -20,6 +20,8 @@ sourceCompatibility = 1.8
 
 repositories {
     mavenCentral()
+    jcenter()
+    maven { url "https://dl.bintray.com/kotlin/exposed"}
     maven { url 'http://52.48.142.75/maven' }
 }
 
@@ -30,6 +32,8 @@ dependencies {
     compile 'mysql:mysql-connector-java:5.1.13'
     compile 'com.google.guava:guava:25.0-jre'
     compile 'com.uadaf:uadamlib:1.0'
+    compile 'org.jetbrains.exposed:exposed:0.10.4'
+    compile 'org.slf4j:slf4j-simple:1.7.25'
 }
 
 compileKotlin {
