@@ -1,10 +1,8 @@
 package com.gt22.web.servlets
 
 import com.google.common.hash.Hashing
-import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.gt22.randomutils.Instances
-import com.gt22.uadam.utils.set
 import com.gt22.web.DatabaseConnector
 import com.gt22.web.Quoter
 import com.gt22.web.Quoter.id
@@ -27,11 +25,11 @@ class QuoterServlet : HttpServlet() {
         DatabaseConnector.init()
         val params = req.params()
         val r = try {
-            when (params["task"]) {
+            checkIsSet(params, "task")
+            when (params["task"]!!) {
                 "GET" -> get(params)
                 "ADD" -> add(params)
                 "EDIT" -> edit(params)
-                null -> rep("TASK_NOT_SET")
                 else -> rep("INVALID_TASK")
             }
         } catch(e: SQLException) {
@@ -43,71 +41,56 @@ class QuoterServlet : HttpServlet() {
         res.writer.println(formatResponse(r))
     }
 
-    private fun buildQuote(row: ResultRow): JsonObject {
-        return with(Quoter) {
-            with(row) {
-                val ret = JsonObject()
-                ret["id"] = get(id)
-                ret["author"] = get(author)
-                ret["adder"] = get(adder)
-                ret["quote"] = get(quote)
-                ret["edited_by"] = get(editedBy) ?: "null"
-                ret["edited_at"] = get(editedAt) ?: -1
-                ret
+
+
+    private fun buildQuote(row: ResultRow) = with(Quoter) {
+        with(row) {
+            json {
+                "id" to get(id)
+                "author" to get(author)
+                "adder" to get(adder)
+                "quote" to get(quote)
+                "edited_by" to (get(editedBy) ?: "null")
+                "edited_at" to (get(editedAt) ?: -1)
             }
         }
     }
 
-    fun get(params: Map<String, String>): JsonObject {
+    fun get(params: Map<String, String>) = transaction {
         checkIsSet(params, "mode")
-        return transaction {
-            when (params["mode"]) {
-                "pos" -> {
-                    checkIsSet(params, "pos")
-                    getPos(params["pos"]!!.toInt())
-                }
-                "fromto" -> {
-                    checkIsSet(params, "from", "to")
-                    getRange(params["from"]!!.toInt(), params["to"]!!.toInt())
-                }
-                "rand" -> getRand()
-                "total" -> {
-                    val ret = JsonObject()
-                    ret["error"] = false
-                    ret["message"] = "success"
-                    ret["count"] = getQuoteCount()
-                    ret
-                }
-                null -> rep("MODE_NOT_SET")
-                else -> rep("INVALID_MODE")
+        when (params["mode"]) {
+            "pos" -> {
+                checkIsSet(params, "pos")
+                getPos(params["pos"]!!.toInt())
             }
+            "fromto" -> {
+                checkIsSet(params, "from", "to")
+                getRange(params["from"]!!.toInt(), params["to"]!!.toInt())
+            }
+            "rand" -> getRand()
+            "total" -> {
+                json {
+                    "error" to false
+                    "message" to "success"
+                    "count" to getQuoteCount()
+                }
+            }
+            null -> rep("MODE_NOT_SET")
+            else -> rep("INVALID_MODE")
         }
     }
 
-    private fun getPos(pos: Int): JsonObject {
-        return with(Quoter) {
-            buildQuote(select { id eq pos }.firstOrNull() ?: return rep("QUOTE_NOT_FOUND"))
-        }
+    private fun getPos(pos: Int) = with(Quoter) {
+        buildQuote(select { id eq pos }.firstOrNull() ?: return rep("QUOTE_NOT_FOUND"))
     }
 
-    private fun getQuoteCount(): Int {
-        return Quoter.selectAll().count()
+    private fun getQuoteCount() = Quoter.selectAll().count()
+
+    private fun getRange(from: Int, to: Int) = json {
+        "quotes" to Quoter.select { (id greater from) and (id less to) }.asSequence().map(::buildQuote)
     }
 
-    private fun getRange(from: Int, to: Int): JsonObject {
-        val ret = JsonObject()
-        val quotes = JsonArray()
-        ret["quotes"] = quotes
-        Quoter.select { (id greater from) and (id less to) }
-                .asSequence().map(::buildQuote).forEach(quotes::add)
-        return ret
-    }
-
-    private fun getRand(): JsonObject {
-        val count = getQuoteCount()
-        val pos = Instances.getRand().nextInt(count) + 1
-        return getPos(pos)
-    }
+    private fun getRand() = getPos(Instances.getRand().nextInt(getQuoteCount()) + 1)
 
     private fun add(params: Map<String, String>): JsonObject {
         checkIsSet(params, "key", "adder", "author", "quote")
@@ -144,9 +127,8 @@ class QuoterServlet : HttpServlet() {
         }
     }
 
-    private fun isKeyValid(key: String): Boolean {
-        return Hashing.sha256().hashString(key, StandardCharsets.UTF_8).toString() ==
-                "bf077926f1f26e2e3552001461c1e51ec078c7d488f1519bd570cc86f0efeb1a"
-    }
+    private fun isKeyValid(key: String) =
+            Hashing.sha256().hashString(key, StandardCharsets.UTF_8).toString() ==
+                    "bf077926f1f26e2e3552001461c1e51ec078c7d488f1519bd570cc86f0efeb1a"
 
 }

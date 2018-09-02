@@ -1,10 +1,12 @@
 package com.gt22.web.servlets
 
-import com.google.gson.*
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonElement
+import com.google.gson.JsonPrimitive
 import com.gt22.uadam.data.*
-import com.gt22.uadam.utils.set
-import com.gt22.uadam.utils.str
 import com.gt22.uadam.utils.get
+import com.gt22.uadam.utils.str
+import com.gt22.web.utlis.json
 import com.gt22.web.utlis.prepare
 import java.nio.file.Paths
 import javax.servlet.annotation.WebServlet
@@ -34,21 +36,15 @@ class MusicServlet : HttpServlet() {
         return jsonify(context)
     }
 
-    fun jsonify(data: BaseData): JsonElement {
-        val ret = JsonObject()
-        ret["meta"] = getMeta(data)
-        ret["children"] = if(data is Album) {
-            val children = JsonArray()
-            data.children.values.map(BaseData::name).forEach(children::add)
-            children
+    fun jsonify(data: BaseData): JsonElement = json {
+        "meta" to getMeta(data)
+        if(data is Album) {
+            "children" to data.children.values.asSequence().map(BaseData::name).map(::JsonPrimitive)
         } else {
-            val children = JsonObject()
-            data.children.forEach { name, value ->
-                children[name] = jsonify(value)
+            "children" to {
+                data.children.forEach { name, value -> name to jsonify(value) }
             }
-            children
         }
-        return ret
     }
 
     private fun type(data: BaseData): String = when (data) {
@@ -60,18 +56,10 @@ class MusicServlet : HttpServlet() {
         else -> "Unknown"
     }
 
-    private fun getMeta(data: BaseData): JsonObject {
-        val ret = JsonObject()
-        if (data.title != data.name) {
-            ret["title"] = data.title
-        }
-        if (data.format != data.parent?.format) {
-            ret["format"] = data.format
-        }
-        if (data.img != data.parent?.img) {
-            ret["img"] = data.img
-        }
-        return ret
+    private fun getMeta(data: BaseData) = json {
+        if (data.title != data.name) "title" to data.title
+        if (data.format != data.parent?.format) "format" to data.format
+        if (data.img != data.parent?.img) "img" to data.img
     }
 
 }

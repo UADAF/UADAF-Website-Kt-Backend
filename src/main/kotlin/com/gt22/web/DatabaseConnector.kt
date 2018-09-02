@@ -3,12 +3,7 @@ package com.gt22.web
 import com.google.gson.JsonElement
 import com.gt22.uadam.utils.get
 import com.gt22.uadam.utils.str
-import com.mysql.jdbc.NonRegisteringDriver
 import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.transactions.transaction
-import java.sql.Connection
-import java.sql.DriverManager
 
 object DatabaseConnector {
 

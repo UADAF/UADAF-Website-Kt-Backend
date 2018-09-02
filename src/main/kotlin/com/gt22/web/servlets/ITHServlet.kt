@@ -60,13 +60,13 @@ class ITHServlet : HttpServlet() {
                 it[story] = 1
             }
         }
-        val ret = JsonObject()
-        ret["isLogged"] = true
-        ret["user"] = username
-        ret["story"] = storyId
-        ret["storyName"] = "Please wait"
-        ret["storyContent"] = "Please wait"
-        return ret
+        return json {
+            "isLogged" to true
+            "user" to username
+            "story" to storyId
+            "storyName" to "Please wait"
+            "storyContent" to "Please wait"
+        }
     }
 
     private fun setStory(params: Map<String, String>): JsonObject {

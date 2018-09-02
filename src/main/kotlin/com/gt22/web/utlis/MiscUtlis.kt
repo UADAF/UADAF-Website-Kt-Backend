@@ -7,11 +7,9 @@ import com.gt22.uadam.utils.set
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
-fun rep(msg: String, isError: Boolean = true): JsonObject {
-    val reply = JsonObject()
-    reply["error"] = isError
-    reply["message"] = msg
-    return reply
+fun rep(msg: String, isError: Boolean = true) = json {
+    "error" to isError
+    "message" to msg
 }
 
 fun HttpServletRequest.params(): Map<String, String> {
